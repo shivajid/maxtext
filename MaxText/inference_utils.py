@@ -17,7 +17,7 @@
 import jax
 import jax.numpy as jnp
 
-NEG_INF = -1.0e7  # Masking purpose
+import common_types
 
 
 # pylint: disable=bare-except, consider-using-generator
@@ -26,15 +26,22 @@ NEG_INF = -1.0e7  # Masking purpose
     Inspired by an Google-internal implementation, Global Vision Transformer.
 """
 
-def sampling(logits, rng, algorithm, topk=0, nucleus_topp=0, temperature=1.0):
+def sample_logits(logits, rng, config=None, algorithm="greedy", topk=0, nucleus_topp=0, temperature=1.0):
   """ 
     logits: unnormalized logits to sample, shaped [YOUR_LEADING_DIMS, Vocab], before logit
     rng: rng key to use
+    config: details of model that include the sampling args
     algorithm: string representing supported algorithms
     topk: restricting to topk logits before sampling
     nucleus_topp: restricting to p probability mass before sampling
     temperature: temperature parameter for scaling probability
   """
+  if config is not None:
+    algorithm = config.decode_sampling_strategy
+    topk = config.decode_sampling_top_k
+    nucleus_topp = config.decode_sampling_nucleus_p
+    temperature = config.decode_sampling_temperature
+    
   if algorithm == "greedy":
     return jnp.argmax(logits, axis=-1)
   elif algorithm == "weighted":
@@ -62,13 +69,13 @@ def sample_nucleus_topp_logits(logits, nucleus_topp, temperature, rng):
       sorted_cum_probs < nucleus_topp, axis=-1, keepdims=True)  # find cutoff index
   cutoff_logit = jnp.take_along_axis(logits_sorted, cutoff_index, axis=-1)
   logits = jnp.where(logits < cutoff_logit,
-                     jnp.full_like(logits, NEG_INF), logits)
+                     jnp.full_like(logits, common_types.NEG_INF), logits)
   return jax.random.categorical(rng, logits / temperature)
 
 def sample_topk_logits(logits, topk, temperature, rng):
   """ Restricting sampling to the best k logits. """
   if topk <= 0:
-    raise ValueError("Can't apply algorithm topk with parameter {topk=} less than or equal to zero")
+    raise ValueError(f"Can't apply algorithm topk with parameter {topk=} less than or equal to zero")
   topk_logits, topk_idxs = jax.lax.top_k(logits, topk)
   topk_token = jnp.expand_dims(
       jax.random.categorical(rng, topk_logits/temperature).astype(jnp.int32),

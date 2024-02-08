@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "Debug MaxText Decode",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "console": "integratedTerminal",
       "justMyCode": false,
@@ -14,12 +14,15 @@
                "base_output_directory=gs://test-maxtext-output",
                "dataset_path=gs://test-maxtext-dataset",
                "steps=2",
+               "max_target_length=9",
+               "max_prefill_predict_length=6",
+               "per_device_batch_size=1",
                "attention=dot_product",
                "enable_checkpointing=false"]
     },
     {
       "name": "Debug MaxText Train",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "console": "integratedTerminal",
       "justMyCode": false,
