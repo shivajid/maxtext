@@ -7,7 +7,7 @@ export M_ICI_AUTOREGRESSIVE_PARALLELISM=-1
 
 python MaxText/experimental_decode_microbenchmark.py \
 MaxText/configs/base.yml \
-assets_path=gs://maxtext-gamma/gamma \
+tokenizer_path=assets/tokenizer.llama2 \
 per_device_batch_size=1 \
 run_name=runner_2024-02-29-18-00 \
 max_prefill_predict_length=1024 \
@@ -16,5 +16,5 @@ dataset_path=gs://maxtext-dataset \
 steps=10 \
 async_checkpointing=false \
 scan_layers=false \
-model_name=gamma-7b \
-attention=recommended
+model_name=llama2-7b \
+attention=autoselected
