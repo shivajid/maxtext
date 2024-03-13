@@ -5,9 +5,9 @@
 export M_ICI_FSDP_PARALLELISM=1
 export M_ICI_AUTOREGRESSIVE_PARALLELISM=-1
 
-python MaxText/experimental_decode_microbenchmark.py \
+python MaxText/microbenchmark.py \
 MaxText/configs/base.yml \
-tokenizer_path=assets/tokenizer.llama2 \
+tokenizer_path=assets/tokenizer.gemma \
 per_device_batch_size=1 \
 run_name=runner_2024-02-29-18-00 \
 max_prefill_predict_length=1024 \
@@ -16,5 +16,6 @@ dataset_path=gs://maxtext-dataset \
 steps=10 \
 async_checkpointing=false \
 scan_layers=false \
-model_name=llama2-7b \
+model_name=gemma-7b \
+weight_dtype=bfloat16 \
 attention=autoselected
