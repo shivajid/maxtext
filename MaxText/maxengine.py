@@ -151,17 +151,17 @@ class MaxEngine(engine_api.Engine):
     one_d_output = ones_to_keep * common_types.DECODING_ACTIVE_SEQUENCE_INDICATOR
     sequence_indicator = jnp.expand_dims(one_d_output, 0)
 
-    with self._mesh, nn_partitioning.axis_rules(self.config.logical_axis_rules):
-      flat_logits, new_vars = self.model.apply(
-        params,
-        input_tokens,
-        positions,
-        decoder_segment_ids=sequence_indicator,
-        enable_dropout=False,
-        model_mode=common_types.MODEL_MODE_PREFILL,
-        rngs={'params': self.rng},
-        mutable=["cache"]
-      )
+    # with self._mesh, nn_partitioning.axis_rules(self.config.logical_axis_rules):
+    flat_logits, new_vars = self.model.apply(
+      params,
+      input_tokens,
+      positions,
+      decoder_segment_ids=sequence_indicator,
+      enable_dropout=False,
+      model_mode=common_types.MODEL_MODE_PREFILL,
+      rngs={'params': self.rng},
+      mutable=["cache"]
+    )
 
     next_pos = jnp.full((1,1), true_length, dtype = jnp.int32)
     generated_tokens = jnp.zeros((1,1), dtype = jnp.int32)
@@ -183,16 +183,16 @@ class MaxEngine(engine_api.Engine):
                                         nucleus_topp=self.config.decode_sampling_nucleus_p,
                                         temperature=self.config.decode_sampling_temperature)
 
-    with self._mesh, nn_partitioning.axis_rules(self.config.logical_axis_rules):
-      out_logits, new_vars = self.model.apply(
-        params | { 'cache': decode_state['cache']},
-        new_token,
-        decode_state['next_pos'],
-        enable_dropout=False,
-        model_mode=common_types.MODEL_MODE_AUTOREGRESSIVE,
-        rngs={'params': self.rng},
-        mutable=['cache']
-      )
+    # with self._mesh, nn_partitioning.axis_rules(self.config.logical_axis_rules):
+    out_logits, new_vars = self.model.apply(
+      params | { 'cache': decode_state['cache']},
+      new_token,
+      decode_state['next_pos'],
+      enable_dropout=False,
+      model_mode=common_types.MODEL_MODE_AUTOREGRESSIVE,
+      rngs={'params': self.rng},
+      mutable=['cache']
+    )
 
     all_valid = jnp.ones(new_token.shape, dtype=jnp.int8)
 
