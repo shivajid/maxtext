@@ -167,6 +167,6 @@ class DockerImage(enum.Enum):
       f"{datetime.datetime.today().strftime('%Y-%m-%d')}"
   )
   MAXTEXT_ANISHA_TPU_JAX_STABLE = (
-      "gcr.io/tpu-prod-env-multipod/mazumdera_runner7_onesharedvar:"
+      "gcr.io/tpu-prod-env-multipod/mazumdera_runner7_twosharedvars:"
       f"{datetime.datetime.today().strftime('%Y-%m-%d')}"
   )
