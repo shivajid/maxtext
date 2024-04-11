@@ -102,6 +102,9 @@ with models.DAG(
               gcs_subfolder,
               test_group_id,
           )
+          idx = name_format.generate_idx_from_date_time(
+              test_group_id,
+          )
           stable_cpu = gke_config.get_maxtext_cpu_end_to_end_gke_config(
               device_type=test_scripts_details[0]["cpu_device_type"],
               cpu_zone=test_scripts_details[0]["cpu_zone"],
@@ -109,9 +112,10 @@ with models.DAG(
               test_name=f"{test_name_prefix}-stable-{model}",
               run_model_cmds=(f"bash end_to_end/{test_scripts_details[0]["script_name"]}.sh",),
               cluster_name=test_scripts_details[0]["cluster_name"],
-              docker_image=DockerImage.MAXTEXT_TPU_JAX_STABLE.value,
+              #TODO: Anisha change this docker_images for each run
+              docker_image=DockerImage.MAXTEXT_ANISHA_TPU_JAX_STABLE.value,
               test_owner=test_owner.ANISHA_M,
-          ).run(model_bucket=shared_gcs_location)
+          ).run(gcs_location=shared_gcs_location, idx=idx)
           stable_tpu = gke_config.get_gke_config(
               tpu_version=test_scripts_details[1]["tpu_version"],
               tpu_cores=test_scripts_details[1]["tpu_cores"],
@@ -119,9 +123,9 @@ with models.DAG(
               time_out_in_min=60,
               test_name=f"{test_name_prefix}-stable-{model}",
               run_model_cmds=(f"bash end_to_end/{test_scripts_details[1]["script_name"]}.sh",),
-              docker_image=DockerImage.MAXTEXT_TPU_JAX_STABLE.value,
+              docker_image=DockerImage.MAXTEXT_ANISHA_TPU_JAX_STABLE.value,
               test_owner=test_owner.ANISHA_M,
-              ).run(model_bucket=shared_gcs_location)
+              ).run(gcs_location=shared_gcs_location, idx=idx)
           nightly_cpu = gke_config.get_maxtext_cpu_end_to_end_gke_config(
               device_type=test_scripts_details[0]["cpu_device_type"],
               cpu_zone=test_scripts_details[0]["cpu_zone"],
@@ -129,9 +133,9 @@ with models.DAG(
               test_name=f"{test_name_prefix}-nightly-{model}",
               run_model_cmds=(f"bash end_to_end/{test_scripts_details[0]["script_name"]}.sh",),
               cluster_name=test_scripts_details[0]["cluster_name"],
-              docker_image=DockerImage.MAXTEXT_TPU_JAX_NIGHTLY.value,
+              docker_image=DockerImage.MAXTEXT_ANISHA_TPU_JAX_STABLE.value,
               test_owner=test_owner.ANISHA_M,
-          ).run(model_bucket=shared_gcs_location)
+          ).run(gcs_location=shared_gcs_location, idx=idx)
           nightly_tpu = gke_config.get_gke_config(
               tpu_version=test_scripts_details[1]["tpu_version"],
               tpu_cores=test_scripts_details[1]["tpu_cores"],
@@ -139,8 +143,8 @@ with models.DAG(
               time_out_in_min=60,
               test_name=f"{test_name_prefix}-nightly-{model}",
               run_model_cmds=(f"bash end_to_end/{test_scripts_details[1]["script_name"]}.sh",),
-              docker_image=DockerImage.MAXTEXT_TPU_JAX_NIGHTLY.value,
+              docker_image=DockerImage.MAXTEXT_ANISHA_TPU_JAX_STABLE.value,
               test_owner=test_owner.ANISHA_M,
-          ).run(model_bucket=shared_gcs_location)
+          ).run(gcs_location=shared_gcs_location, idx=idx)
           stable_cpu >> stable_tpu >> nightly_cpu >> nightly_tpu
 

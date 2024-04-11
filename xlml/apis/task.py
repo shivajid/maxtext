@@ -332,6 +332,7 @@ class XpkTask(BaseTask):
       self,
       *,
       gcs_location: Optional[airflow.XComArg] = None,
+      idx: Optional[airflow.XComArg] = None,
   ) -> DAGNode:
     """Run a test job within a docker image.
 
@@ -343,7 +344,7 @@ class XpkTask(BaseTask):
       post_process.
     """
     with TaskGroup(group_id=self.task_test_config.benchmark_id) as group:
-      self.run_model(gcs_location) >> self.post_process()
+      self.run_model(gcs_location, idx) >> self.post_process()
 
     return group
 
@@ -383,6 +384,7 @@ class XpkTask(BaseTask):
   def run_model(
       self,
       gcs_location: Optional[airflow.XComArg] = None,
+      idx: Optional[airflow.XComArg] = None,
   ) -> DAGNode:
     """Run the TPU/GPU test in `task_test_config` using xpk.
 
@@ -401,7 +403,9 @@ class XpkTask(BaseTask):
             self.task_test_config.gcs_subfolder,
             self.task_test_config.benchmark_id,
         )
-      launch_workload = self.launch_workload(workload_id, gcs_path)
+      if not idx:
+        idx = name_format.generate_idx_from_date_time(self.task_test_config.benchmark_id)
+      launch_workload = self.launch_workload(workload_id, gcs_path, idx)
       wait_for_workload_completion = xpk.wait_for_workload_completion.override(
           timeout=self.task_test_config.time_out_in_min * 60,
       )(
@@ -414,7 +418,7 @@ class XpkTask(BaseTask):
       (workload_id, gcs_path) >> launch_workload >> wait_for_workload_completion
       return group
 
-  def launch_workload(self, workload_id: str, gcs_path: str) -> DAGNode:
+  def launch_workload(self, workload_id: str, gcs_path: str, idx: str) -> DAGNode:
     """Create the workload and wait for it to provision."""
     with TaskGroup(group_id="launch_workload") as group:
       run_workload = xpk.run_workload.override(
@@ -427,6 +431,7 @@ class XpkTask(BaseTask):
           benchmark_id=self.task_test_config.benchmark_id,
           workload_id=workload_id,
           gcs_path=gcs_path,
+          idx=idx,
           docker_image=self.task_test_config.docker_image,
           accelerator_type=self.task_test_config.accelerator.name,
           run_cmds=self.task_test_config.test_script,

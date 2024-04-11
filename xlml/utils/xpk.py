@@ -51,6 +51,7 @@ def run_workload(
     benchmark_id: str,
     workload_id: str,
     gcs_path: str,
+    idx: str,
     docker_image: str,
     accelerator_type: str,
     run_cmds: str,
@@ -72,7 +73,8 @@ def run_workload(
             f" --command='{run_cmds}' --device-type={accelerator_type}"
             f" --{multi_keyword}={num_slices} --docker-image={docker_image}"
             f" --project={cluster_project} --zone={zone}"
-            f" --env {metric_config.SshEnvVars.GCS_OUTPUT.name}={gcs_path}"
+            f" --env {metric_config.SshEnvVars.MODEL_BUCKET.name}={gcs_path}"
+            f" --env {metric_config.SshEnvVars.IDX.name}={idx}"
             " --restart-on-user-code-failure"
         ),
     )

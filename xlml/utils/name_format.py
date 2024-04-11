@@ -63,3 +63,16 @@ def generate_gcs_folder_location(subfolder: str, benchmark_id: str) -> str:
       subfolder,
       f"{benchmark_id}-{current_datetime}/",
   )
+
+
+@task
+def generate_idx_from_date_time(benchmark_id: str) -> str:
+  """Generates folder location in GCS.
+
+  Args:
+    benchmark_id: Benchmark id of the test
+
+  Returns: GCS folder name with location
+  """
+  current_datetime = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+  return f"{benchmark_id}-{current_datetime}",
