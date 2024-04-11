@@ -116,6 +116,9 @@ def create_random_keys(x):
   return random.PRNGKey(int(jnp.sum(jnp.abs(x))))
 
 def main(argv: Sequence[str]) -> None:
+  print('Start initialize_jax_for_cpu')
+  max_utils.initialize_jax_for_cpu()
+  print('JAX distributed Init has finished')
   jax.config.update('jax_cpu_enable_gloo_collectives', True)
   os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"
   pyconfig.initialize(argv)
