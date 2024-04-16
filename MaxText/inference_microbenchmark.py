@@ -80,14 +80,18 @@ def prefill_benchmark(config, engine, params, decode_state, tokens, true_length,
 
 def ar_benchmark_loop(config, engine, decode_state, params, iters, profile_name=""):
   """ Inner loop for benchmarking ar step. """
+  all_generate_seconds = []
   max_utils.activate_profiler(config, profile_name)
-  start = datetime.datetime.now()
   for _ in range(iters):
+    start = datetime.datetime.now()
     decode_state, _ = engine.generate(params, decode_state)
     jax.block_until_ready(decode_state)
-  end = datetime.datetime.now()
+    end = datetime.datetime.now()
+    generate_seconds = (end - start).total_seconds()
+    all_generate_seconds.append(generate_seconds)
+
   max_utils.deactivate_profiler(config)
-  return (end - start).total_seconds(), decode_state
+  return np.average(all_generate_seconds), decode_state
 
 
 def ar_benchmark(config, engine, params, decode_state, cache_size=None, model_size=None, profile_name="", iters=100):
@@ -104,8 +108,7 @@ def ar_benchmark(config, engine, params, decode_state, cache_size=None, model_si
     jax.block_until_ready(decode_state)
 
   profile_name = "autoregress" if profile_name == "" else profile_name
-  time_in_s, decode_state = ar_benchmark_loop(config, engine, decode_state, params, profile_name=profile_name, iters=iters)
-  seconds_per_step = time_in_s / iters
+  seconds_per_step, decode_state = ar_benchmark_loop(config, engine, decode_state, params, profile_name=profile_name, iters=iters)
   ar_average_ms = seconds_per_step*1000
   total_throughput = jax.device_count() * config.per_device_batch_size / seconds_per_step
 
