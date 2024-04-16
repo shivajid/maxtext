@@ -75,6 +75,10 @@ class MaxEngine(engine_api.Engine):
     self.kv_cache_shardings = None
     self.state_mesh_annotations = None
 
+    if config.enable_profiler:
+      jax.profiler.start_server(config.profiler_server_port)
+      print(f'Starting jax profiler server at {config.profiler_server_port}')
+
   def load_params(self, *args, **kwargs) -> Params:
     ''' Load Parameters, typically from GCS ''' 
     # pylint: disable=unused-argument
