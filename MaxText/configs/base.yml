@@ -265,3 +265,4 @@ vertex_tensorboard_region: ""
 # Inference
 inference_mode: False
 inference_microbenchmark_prefill_lengths: "64,128,256,512,1024"
+inference_microbenchmark_stages: "prefill,generate"

@@ -163,6 +163,7 @@ def main(config):
   engine = maxengine.MaxEngine(config)
   params = engine.load_params()
   prefill_lengths = [int(l) for l in config.inference_microbenchmark_prefill_lengths.split(",")]
+  stages_to_benchmark = config.inference_microbenchmark_stages.split(",")
   benchmark_loop_iters = 10
   text = config.prompt
   metadata = engine.get_tokenizer()
@@ -172,15 +173,19 @@ def main(config):
   _, cache_size, _ = inference_utils.summarize_pytree_data(decode_state['cache'], name="Cache")
   num_model_params, model_size, _ = inference_utils.summarize_pytree_data(params, name="Model")
 
-  benchmark_results = {"Prefill": {}}
-  benchmark_results["AutoRegressive"], decode_state = ar_benchmark(
-    config, engine, params, decode_state, iters=benchmark_loop_iters, cache_size=cache_size, model_size=model_size)
-  for prefill_length in prefill_lengths:
-    tokens, true_length = token_utils.tokenize_and_pad(
-      text, vocab, is_bos=True, prefill_lengths=[prefill_length])
-    benchmark_results["Prefill"][prefill_length], decode_state = prefill_benchmark(
-      config, engine, params, decode_state, tokens, true_length,
-      iters=benchmark_loop_iters, num_model_params=num_model_params)
+  benchmark_results = dict()
+  if "prefill" in stages_to_benchmark:
+    benchmark_results["Prefill"] = dict()
+    for prefill_length in prefill_lengths:
+      tokens, true_length = token_utils.tokenize_and_pad(
+        text, vocab, is_bos=True, prefill_lengths=[prefill_length])
+      benchmark_results["Prefill"][prefill_length], decode_state = prefill_benchmark(
+        config, engine, params, decode_state, tokens, true_length,
+        iters=benchmark_loop_iters, num_model_params=num_model_params)
+
+  if "generate" in stages_to_benchmark:
+    benchmark_results["AutoRegressive"], decode_state = ar_benchmark(
+      config, engine, params, decode_state, iters=benchmark_loop_iters, cache_size=cache_size, model_size=model_size)
 
   results = collate_results(config, benchmark_results, model_size, cache_size, num_model_params)
   write_results(results, filename="")
