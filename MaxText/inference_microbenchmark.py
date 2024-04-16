@@ -20,58 +20,53 @@ import jax
 import json
 import sys
 
+import numpy as np
+
 from jetstream.engine import token_utils
+
 import max_utils
 import maxengine
 import maxtext_utils
 import pyconfig
-
-
-def summarize_pytree_data(params, name="Params"):
-  """ Generate basic metrics of a given Pytree. """
-  num_params, total_param_size, avg_param_size = max_utils.summarize_size_from_pytree(params)
-  num_params_in_billions = num_params / 1e9
-  total_param_size_in_gb = total_param_size / 1e9
-  print(f"{name} stats: \n"
-        f"\tTotal number of params: {num_params_in_billions:.3f} billion \n"
-        f"\tTotal memory usage: {total_param_size_in_gb:.3f} GB \n"
-        f"\tAvg size: {avg_param_size:.3f} bytes\n")
-  return num_params, total_param_size, avg_param_size
-
+import inference_utils
 
 def prefill_benchmark_loop(config, engine, decode_state, params, tokens, true_length, iters, profile_name=""):
   """ Inner loop for benchmarking prefill step. """
+  all_prefill_seconds = []
   max_utils.activate_profiler(config, profile_name)
-  start = datetime.datetime.now()
   for i in range(iters):
     slot = int(i % (jax.device_count() * config.per_device_batch_size))
+    start = datetime.datetime.now()
     prefill_result = engine.prefill(params=params, padded_tokens=tokens, true_length=true_length)
+    jax.block_until_ready(prefill_result)
+    end = datetime.datetime.now()
+    prefill_seconds = (end - start).total_seconds()
+    all_prefill_seconds.append(prefill_seconds)
     decode_state = engine.insert(prefill_result, decode_state, slot=slot)
-  jax.block_until_ready(decode_state)
-  end = datetime.datetime.now()
+    jax.block_until_ready(decode_state)
+    inference_utils.delete_pytree(prefill_result)
   max_utils.deactivate_profiler(config)
-  return (end - start).total_seconds(), decode_state
+  return np.average(all_prefill_seconds), decode_state
 
 
 def prefill_benchmark(config, engine, params, decode_state, tokens, true_length,
                       iters=100, profile_name="", num_model_params=None):
   """ Handles init, warmup, running prefill benchmark, and printing results. """
   if num_model_params is None:
-    num_model_params, _, _ = summarize_pytree_data(params, name="Params")
+    num_model_params, _, _ = inference_utils.summarize_pytree_data(params, name="Params")
 
-  prefill_result = engine.prefill(params=params, padded_tokens=tokens, true_length=true_length)
-  decode_state = engine.insert(prefill_result, decode_state, slot=0)
-  jax.block_until_ready(decode_state)
-  prefill_result = engine.prefill(params=params, padded_tokens=tokens, true_length=true_length)
-  decode_state = engine.insert(prefill_result, decode_state, slot=0)
-  jax.block_until_ready(decode_state)
+  for i in range(2):
+    prefill_result = engine.prefill(params=params, padded_tokens=tokens, true_length=true_length)
+    decode_state = engine.insert(prefill_result, decode_state, slot=i)
+    jax.block_until_ready(decode_state)
+    inference_utils.delete_pytree(prefill_result)
 
   print(f"Prefill results for length {tokens.size}:\n")
 
   profile_name = f"prefill_{tokens.size}" if profile_name == "" else profile_name
   time_in_s, decode_state = prefill_benchmark_loop(config, engine, decode_state, params, tokens, true_length, iters,
                                                    profile_name=profile_name)
-  prefill_average_ms = 1000 * time_in_s / iters
+  prefill_average_ms = time_in_s * 1000
   total_prefill_tflops, _, _ = maxtext_utils.calculate_tflops_prefill(num_model_params, tokens.size, config)
   tflops_per_sec_per_device = total_prefill_tflops / jax.device_count() / prefill_average_ms * 1000.
   print(f"\tPrefill step average time: {prefill_average_ms:.3f}ms\n"
@@ -89,7 +84,7 @@ def ar_benchmark_loop(config, engine, decode_state, params, iters, profile_name=
   start = datetime.datetime.now()
   for _ in range(iters):
     decode_state, _ = engine.generate(params, decode_state)
-  jax.block_until_ready(decode_state)
+    jax.block_until_ready(decode_state)
   end = datetime.datetime.now()
   max_utils.deactivate_profiler(config)
   return (end - start).total_seconds(), decode_state
@@ -98,16 +93,15 @@ def ar_benchmark_loop(config, engine, decode_state, params, iters, profile_name=
 def ar_benchmark(config, engine, params, decode_state, cache_size=None, model_size=None, profile_name="", iters=100):
   """ Handles init, warmup, running ar benchmark, and printing results. """
   if cache_size is None:
-    _, cache_size, _ = summarize_pytree_data(decode_state['cache'], name="Cache")
+    _, cache_size, _ = inference_utils.summarize_pytree_data(decode_state['cache'], name="Cache")
   if model_size is None:
-    _, model_size, _ = summarize_pytree_data(params, name="Params")
+    _, model_size, _ = inference_utils.summarize_pytree_data(params, name="Params")
   global_batch_size = jax.device_count() * config.per_device_batch_size
 
   # Warmup
-  decode_state, _ = engine.generate(params, decode_state)
-  jax.block_until_ready(decode_state)
-  decode_state, _ = engine.generate(params, decode_state)
-  jax.block_until_ready(decode_state)
+  for _ in range(2):
+    decode_state, _ = engine.generate(params, decode_state)
+    jax.block_until_ready(decode_state)
 
   profile_name = "autoregress" if profile_name == "" else profile_name
   time_in_s, decode_state = ar_benchmark_loop(config, engine, decode_state, params, profile_name=profile_name, iters=iters)
@@ -165,15 +159,15 @@ def print_results_for_analyze(results):
 def main(config):
   engine = maxengine.MaxEngine(config)
   params = engine.load_params()
-  prefill_lengths = [64, 128, 256, 512, 1024]
+  prefill_lengths = [int(l) for l in config.inference_microbenchmark_prefill_lengths.split(",")]
   benchmark_loop_iters = 10
   text = config.prompt
   metadata = engine.get_tokenizer()
   vocab = token_utils.load_vocab(metadata.path, metadata.extra_ids)
 
   decode_state = engine.init_decode_state()
-  _, cache_size, _ = summarize_pytree_data(decode_state['cache'], name="Cache")
-  num_model_params, model_size, _ = summarize_pytree_data(params, name="Model")
+  _, cache_size, _ = inference_utils.summarize_pytree_data(decode_state['cache'], name="Cache")
+  num_model_params, model_size, _ = inference_utils.summarize_pytree_data(params, name="Model")
 
   benchmark_results = {"Prefill": {}}
   benchmark_results["AutoRegressive"], decode_state = ar_benchmark(

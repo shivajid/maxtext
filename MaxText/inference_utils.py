@@ -17,6 +17,8 @@
 import jax
 import jax.numpy as jnp
 
+import max_utils
+
 NEG_INF = -1.0e7  # Masking purpose
 
 
@@ -79,3 +81,22 @@ def sample_topk_logits(logits, topk, temperature, rng):
   return sampled_tokens
 
 
+def delete_pytree(p):
+  def delete_leaf(leaf):
+    if isinstance(leaf, jax.Array):
+      leaf.delete()
+    del leaf
+
+  jax.tree_map(delete_leaf, p)
+
+
+def summarize_pytree_data(params, name="Params"):
+  """ Generate basic metrics of a given Pytree. """
+  num_params, total_param_size, avg_param_size = max_utils.summarize_size_from_pytree(params)
+  num_params_in_billions = num_params / 1e9
+  total_param_size_in_gb = total_param_size / 1e9
+  print(f"{name} stats: \n"
+        f"\tTotal number of params: {num_params_in_billions:.3f} billion \n"
+        f"\tTotal memory usage: {total_param_size_in_gb:.3f} GB \n"
+        f"\tAvg size: {avg_param_size:.3f} bytes\n")
+  return num_params, total_param_size, avg_param_size
