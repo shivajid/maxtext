@@ -158,12 +158,15 @@ def write_results(results, filename=""):
 
 
 def print_results_for_analyze(results):
-  prefill_bucket_size_to_ms = {}
-  for k, v in results["Prefill"].items():
-    prefill_bucket_size_to_ms[int(k)] = round(v["prefill_time_in_ms"], 3)
-  print("\nFor usage in analyze_sharegpt.py :")
-  print(f"PREFILL_BUCKET_SIZE_TO_MS = {prefill_bucket_size_to_ms}")
-  print(f"SYSTEM_TIME_PER_DECODE_TOKEN_MS = {results['AutoRegressive']['ar_step_in_ms_per_seq']}")
+  if "Prefill" in results:
+    prefill_bucket_size_to_ms = {}
+    for k, v in results["Prefill"].items():
+      prefill_bucket_size_to_ms[int(k)] = round(v["prefill_time_in_ms"], 3)
+    print("\nFor usage in analyze_sharegpt.py :")
+    print(f"PREFILL_BUCKET_SIZE_TO_MS = {prefill_bucket_size_to_ms}")
+
+  if "AutoRegressive" in results:
+    print(f"SYSTEM_TIME_PER_DECODE_TOKEN_MS = {results['AutoRegressive']['ar_step_in_ms_per_seq']}")
 
 
 def main(config):
