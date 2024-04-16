@@ -108,7 +108,14 @@ def ar_benchmark(config, engine, params, decode_state, cache_size=None, model_si
     jax.block_until_ready(decode_state)
 
   profile_name = "autoregress" if profile_name == "" else profile_name
-  seconds_per_step, decode_state = ar_benchmark_loop(config, engine, decode_state, params, profile_name=profile_name, iters=iters)
+  seconds_per_step, decode_state = ar_benchmark_loop(
+    config,
+    engine,
+    decode_state,
+    params,
+    profile_name=profile_name,
+    iters=iters
+  )
   ar_average_ms = seconds_per_step*1000
   total_throughput = jax.device_count() * config.per_device_batch_size / seconds_per_step
 
@@ -173,9 +180,9 @@ def main(config):
   _, cache_size, _ = inference_utils.summarize_pytree_data(decode_state['cache'], name="Cache")
   num_model_params, model_size, _ = inference_utils.summarize_pytree_data(params, name="Model")
 
-  benchmark_results = dict()
+  benchmark_results = {}
   if "prefill" in stages_to_benchmark:
-    benchmark_results["Prefill"] = dict()
+    benchmark_results["Prefill"] = {}
     for prefill_length in prefill_lengths:
       tokens, true_length = token_utils.tokenize_and_pad(
         text, vocab, is_bos=True, prefill_lengths=[prefill_length])
